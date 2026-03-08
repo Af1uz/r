@@ -1085,7 +1085,7 @@ export default function IntroPage() {
       </div>
 
       {/* pricing */}
-      <section className="pricing">
+      {/* <section className="pricing">
         <div className="pricing-top">
           <div className="pricing-eye">Obuna</div>
           <h2 className="pricing-title">Sizga mos tarifni tanlang</h2>
@@ -1119,7 +1119,7 @@ export default function IntroPage() {
             </div>
           ))}
         </div>
-      </section>
+      </section> */}
 
       {/* faq */}
       <section className="faq">
