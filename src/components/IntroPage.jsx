@@ -1,11 +1,12 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 
 /* ══════════════════════════════════════════════
    RAFFINI — intro.jsx  (Mahsulotlar sahifasi)
-   · 4 filial, har birida 20+ mahsulot
-   · Butunlay boshqa karta dizayni
-   · Filtrlar, saralash, wishlist
-   · Toast bildirish
+   · Responsive to'liq tuzatildi
+   · Mobile touch support (hover → tap)
+   · Sidebar mobile collapse
+   · ListCard mobile cart button
+   · Slider CSS fix
 ══════════════════════════════════════════════ */
 
 const CSS = () => (
@@ -20,6 +21,7 @@ const CSS = () => (
       --line:rgba(61,61,61,.09); --line2:rgba(61,61,61,.17);
       --serif:'Cormorant Garamond',Georgia,serif;
       --ui:'Outfit',sans-serif;
+      --strip-h:40px;
     }
     html,body,#root{background:var(--bg);color:var(--txt);font-family:var(--ui);overflow-x:hidden}
     ::-webkit-scrollbar{width:1.5px}
@@ -41,15 +43,21 @@ const CSS = () => (
     .bsw{
       position:sticky; top:0; z-index:200;
       background:var(--dark); display:flex; align-items:stretch;
+      height:var(--strip-h);
+      overflow-x:auto; overflow-y:hidden;
+      scrollbar-width:none;
     }
+    .bsw::-webkit-scrollbar{display:none}
     .bsw-btn{
-      flex:1; display:flex; align-items:center; justify-content:center; gap:6px;
+      flex:1; min-width:max-content;
+      display:flex; align-items:center; justify-content:center; gap:6px;
       font-family:var(--ui); font-size:7.5px; font-weight:300;
-      letter-spacing:.22em; text-transform:uppercase;
+      letter-spacing:.18em; text-transform:uppercase;
       color:rgba(239,239,239,.3); border:none; background:none; cursor:pointer;
-      padding:13px 0; position:relative;
+      padding:13px 14px; position:relative;
       border-right:1px solid rgba(255,255,255,.04);
       transition:color .2s, background .2s;
+      white-space:nowrap;
     }
     .bsw-btn:last-child{border-right:none}
     .bsw-btn.on{color:rgba(239,239,239,.88); background:rgba(255,255,255,.05)}
@@ -59,12 +67,14 @@ const CSS = () => (
     .bsw-cnt{font-size:7px;font-weight:300;color:rgba(255,255,255,.22)}
 
     /* ─ PAGE LAYOUT ─ */
-    .page{display:grid;grid-template-columns:220px 1fr;min-height:100vh;background:var(--bg)}
+    .page{display:grid;grid-template-columns:220px 1fr;min-height:100vh;background:var(--bg);align-items:start}
+    /* second column must not overflow */
+    .page > div:last-child{min-width:0;overflow:hidden;}
 
     /* ─ SIDEBAR ─ */
     .sidebar{
       background:var(--bg3); border-right:1px solid var(--line);
-      position:sticky; top:40px; height:calc(100vh - 40px);
+      position:sticky; top:var(--strip-h); height:calc(100vh - var(--strip-h));
       overflow-y:auto; padding:28px 0;
       display:flex; flex-direction:column;
     }
@@ -87,20 +97,8 @@ const CSS = () => (
     .sb-cat:not(.on) .sb-cnt{color:var(--acc2)}
     .sb-divider{height:1px; background:var(--line); margin:0 22px 28px}
 
-    /* price range */
-    .pr-range{display:flex;flex-direction:column;gap:6px}
-    .pr-nums{display:flex;justify-content:space-between;font-size:9.5px;font-weight:300;color:var(--txt2)}
-    .pr-slider{
-      appearance:none;width:100%;height:1px;
-      background:linear-gradient(to right, var(--dark) var(--pct,50%), var(--acc) var(--pct,50%));
-      outline:none; cursor:pointer;
-    }
-    .pr-slider::-webkit-slider-thumb{appearance:none;width:10px;height:10px;border-radius:50%;background:var(--dark);border:1.5px solid var(--bg3)}
-
     /* sort */
-    .sb-sort{
-      display:flex;flex-direction:column;gap:2px;
-    }
+    .sb-sort{display:flex;flex-direction:column;gap:2px}
     .sb-sort-item{
       padding:7px 10px; cursor:pointer;
       font-size:11px; font-weight:300; color:var(--txt2);
@@ -130,8 +128,22 @@ const CSS = () => (
     .open-dot.green{background:#5A9E5A}
     .open-dot.red{background:#A05050}
 
+    /* ─ MOBILE SIDEBAR TOGGLE ─ */
+    .sb-toggle{
+      display:none;
+      width:100%; padding:12px 20px;
+      background:var(--bg3); border:none; border-bottom:1px solid var(--line);
+      font-family:var(--ui); font-size:8px; font-weight:400;
+      letter-spacing:.22em; text-transform:uppercase;
+      color:var(--txt2); cursor:pointer;
+      align-items:center; justify-content:space-between;
+    }
+    .sb-toggle-arrow{transition:transform .25s}
+    .sb-toggle.open .sb-toggle-arrow{transform:rotate(180deg)}
+    .sb-mobile-body{overflow:hidden; transition:max-height .38s cubic-bezier(.4,0,.2,1)}
+
     /* ─ MAIN CONTENT ─ */
-    .main-content{padding:32px 36px}
+    .main-content{padding:32px 36px; min-width:0; overflow:hidden;}
     .content-head{
       display:flex;align-items:flex-end;justify-content:space-between;
       margin-bottom:28px;padding-bottom:20px;border-bottom:1px solid var(--line);
@@ -150,21 +162,33 @@ const CSS = () => (
     .vbtn.on{background:var(--dark);border-color:var(--dark);color:#EFEFEF}
 
     /* ─ PRODUCT GRID ─ */
-    .pgrid{display:grid;gap:1px;background:var(--line)}
+    .pgrid{
+      display:grid;
+      gap:0;
+      border-top:1px solid var(--line2);
+      border-left:1px solid var(--line2);
+    }
     .pgrid.g3{grid-template-columns:repeat(3,1fr)}
     .pgrid.g4{grid-template-columns:repeat(4,1fr)}
-    .pgrid.gl{grid-template-columns:1fr}  /* list view */
+    .pgrid.gl{grid-template-columns:1fr}
 
     /* ─ CARD (Grid view) ─ */
     .pcard{
       background:var(--bg3); cursor:pointer;
-      position:relative; overflow:hidden;
+      position:relative;
+      /* overflow only on img-wrap, not whole card */
+      overflow:visible;
       transition:background .22s;
+      border-right:1px solid var(--line2);
+      border-bottom:1px solid var(--line2);
+      /* ensure card never overflows its grid cell */
+      min-width:0; width:100%;
     }
     .pcard:hover{background:var(--bg2)}
 
     .pcard-img-wrap{
-      position:relative; padding-top:128%; overflow:hidden; background:var(--bg2);
+      position:relative; padding-top:120%; overflow:hidden; background:var(--bg2);
+      /* overflow:hidden only on the image area, not info */
     }
     .pcard-img,.pcard-img2{
       position:absolute;inset:0;width:100%;height:100%;
@@ -186,6 +210,8 @@ const CSS = () => (
       transition:transform .36s cubic-bezier(.4,0,.2,1);z-index:3;
     }
     .pcard:hover .pcard-scan{transform:scaleX(1)}
+    /* touch active state */
+    .pcard.touched .pcard-scan{transform:scaleX(1)}
 
     /* badges */
     .pcards-badge{position:absolute;top:10px;left:10px;display:flex;flex-direction:column;gap:3px;z-index:4}
@@ -198,14 +224,15 @@ const CSS = () => (
     .badge-tag.hit{background:var(--acc);color:var(--dark)}
     .badge-tag.lim{background:var(--bg3);color:var(--txt);border:1px solid var(--line2)}
 
-    /* action buttons (right side) */
+    /* action buttons — relative to img-wrap */
     .pcard-actions{
-      position:absolute;bottom:54px;right:10px;
+      position:absolute;bottom:46px;right:8px;
       display:flex;flex-direction:column;gap:3px;z-index:5;
       opacity:0;transform:translateX(8px);
       transition:opacity .2s,transform .2s;
     }
-    .pcard:hover .pcard-actions{opacity:1;transform:translateX(0)}
+    .pcard:hover .pcard-actions,
+    .pcard.touched .pcard-actions{opacity:1;transform:translateX(0)}
     .pact{
       width:28px;height:28px;border:none;
       background:rgba(248,248,248,.94);backdrop-filter:blur(6px);
@@ -223,17 +250,31 @@ const CSS = () => (
       font-family:var(--ui);
       transform:translateY(100%);transition:transform .26s cubic-bezier(.4,0,.2,1);
     }
-    .pcard:hover .pcard-add{transform:translateY(0)}
+    .pcard:hover .pcard-add,
+    .pcard.touched .pcard-add{transform:translateY(0)}
 
     /* card info */
-    .pcard-info{padding:11px 13px 14px}
-    .pcard-brand{font-size:6.5px;font-weight:400;letter-spacing:.26em;text-transform:uppercase;color:var(--acc2);margin-bottom:3px}
-    .pcard-name{font-family:var(--serif);font-size:14px;font-weight:300;color:var(--txt);line-height:1.2;margin-bottom:5px}
-    .pcard-prices{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
-    .pcard-price{font-size:12px;font-weight:300;color:var(--txt)}
-    .pcard-old{font-size:9.5px;font-weight:300;color:var(--acc);text-decoration:line-through}
-    .pcard-disc{font-size:8px;font-weight:500;color:#A05050}
-    .pcard-sizes{display:flex;gap:2px;margin-top:7px;flex-wrap:wrap}
+    .pcard-info{
+      padding:11px 13px 14px;
+      /* critical: prevent text from overflowing grid cell */
+      min-width:0; overflow:hidden; width:100%;
+    }
+    .pcard-brand{
+      font-size:6.5px;font-weight:400;letter-spacing:.26em;text-transform:uppercase;
+      color:var(--acc2);margin-bottom:3px;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+    .pcard-name{
+      font-family:var(--serif);font-size:14px;font-weight:300;color:var(--txt);
+      line-height:1.2;margin-bottom:5px;
+      /* allow wrap on small cards */
+      overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+    }
+    .pcard-prices{display:flex;align-items:baseline;gap:4px;flex-wrap:wrap;min-width:0}
+    .pcard-price{font-size:12px;font-weight:300;color:var(--txt);white-space:nowrap}
+    .pcard-old{font-size:9px;font-weight:300;color:var(--acc);text-decoration:line-through;white-space:nowrap}
+    .pcard-disc{font-size:8px;font-weight:500;color:#A05050;white-space:nowrap}
+    .pcard-sizes{display:flex;gap:2px;margin-top:7px;flex-wrap:wrap;min-width:0}
     .sz{
       font-size:7px;font-weight:300;padding:2px 6px;
       border:1px solid var(--line2);color:var(--acc2);cursor:pointer;
@@ -246,7 +287,7 @@ const CSS = () => (
     .lcard{
       background:var(--bg3); display:flex; align-items:stretch;
       cursor:pointer; position:relative; overflow:hidden;
-      transition:background .22s; gap:0;
+      transition:background .22s;
     }
     .lcard:hover{background:var(--bg2)}
     .lcard-scan{
@@ -262,18 +303,18 @@ const CSS = () => (
       transition:transform .5s;
     }
     .lcard:hover .lcard-img img{transform:scale(1.06)}
-    .lcard-body{flex:1;padding:16px 20px;display:flex;flex-direction:column;justify-content:center}
+    .lcard-body{flex:1;padding:16px 20px;display:flex;flex-direction:column;justify-content:center;min-width:0}
     .lcard-brand{font-size:7px;font-weight:400;letter-spacing:.24em;text-transform:uppercase;color:var(--acc2);margin-bottom:3px}
-    .lcard-name{font-family:var(--serif);font-size:17px;font-weight:300;color:var(--txt);margin-bottom:6px}
+    .lcard-name{font-family:var(--serif);font-size:17px;font-weight:300;color:var(--txt);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .lcard-cat{font-size:9.5px;font-weight:300;color:var(--txt2);margin-bottom:10px}
     .lcard-pr{font-size:13px;font-weight:300;color:var(--txt)}
     .lcard-old{font-size:10px;font-weight:300;color:var(--acc);text-decoration:line-through;margin-left:8px}
     .lcard-right{width:180px;flex-shrink:0;border-left:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:16px}
     .lcard-badges{display:flex;flex-wrap:wrap;gap:3px;justify-content:center;margin-bottom:4px}
     .lcard-sizes{display:flex;gap:2px;flex-wrap:wrap;justify-content:center}
-    .lcard-btns{display:flex;gap:4px}
+    .lcard-btns{display:flex;gap:4px;width:100%}
     .lbtn{
-      width:32px;height:32px;border:none;background:var(--bg2);
+      width:32px;height:32px;flex-shrink:0;border:none;background:var(--bg2);
       cursor:pointer;display:flex;align-items:center;justify-content:center;
       color:var(--txt2);transition:all .18s;
     }
@@ -285,6 +326,16 @@ const CSS = () => (
       border:none;cursor:pointer;transition:background .22s;
     }
     .lbtn-cart:hover{background:var(--dark2)}
+
+    /* Mobile list card - cart inside body */
+    .lcard-mobile-foot{
+      display:none;
+      padding:10px 16px 14px;
+      gap:6px;
+      border-top:1px solid var(--line);
+    }
+    .lcard-mobile-foot .lbtn{height:34px;width:34px}
+    .lcard-mobile-foot .lbtn-cart{height:34px;flex:1;font-size:7px}
 
     /* ─ LOAD MORE ─ */
     .loadmore{
@@ -385,21 +436,75 @@ const CSS = () => (
     .fi.open .fi-a{max-height:120px}
     .fi-at{font-size:12px;font-weight:300;color:var(--txt2);line-height:1.85;padding-bottom:16px}
 
-    @media(max-width:1100px){.pgrid.g4{grid-template-columns:repeat(3,1fr)}}
+    /* ══════════════════════════════════
+       RESPONSIVE BREAKPOINTS
+    ══════════════════════════════════ */
+
+    /* Large: sidebar + 4 col works */
+    @media(min-width:1400px){.pgrid.g4{grid-template-columns:repeat(4,1fr)}}
+
+    /* Medium-large: sidebar + 3 col */
+    @media(max-width:1399px) and (min-width:901px){
+      .pgrid.g4{grid-template-columns:repeat(3,1fr)}
+    }
+
+    /* Tablet: sidebar hidden, full width 3 col */
     @media(max-width:900px){
       .page{grid-template-columns:1fr}
-      .sidebar{position:static;height:auto;flex-direction:row;flex-wrap:wrap;gap:0;padding:16px 0}
-      .sb-section{padding:0 16px;margin-bottom:16px}
-      .pgrid.g4,.pgrid.g3{grid-template-columns:repeat(2,1fr)}
-      .main-content{padding:20px}
+
+      /* Sidebar becomes collapsible panel */
+      .sidebar{
+        position:static; height:auto;
+        flex-direction:column;
+        padding:0; top:0;
+        border-right:none; border-bottom:1px solid var(--line);
+      }
+      .sb-toggle{display:flex}
+      .sb-mobile-body{
+        display:flex; flex-direction:row; flex-wrap:wrap;
+        max-height:0;
+        background:var(--bg3);
+      }
+      .sb-mobile-body.open{max-height:800px}
+      .sb-section{padding:16px 20px; margin-bottom:0; flex:1; min-width:160px}
+      .sb-divider{display:none}
+
+      .pgrid.g4,.pgrid.g3{grid-template-columns:repeat(3,1fr)}
+      .main-content{padding:20px 16px}
+      .content-head{margin-bottom:16px;padding-bottom:14px}
+
       .promo{grid-template-columns:1fr}
-      .plans{grid-template-columns:1fr;max-width:360px}.plan.pop{transform:none}
-      .faq-wrap{grid-template-columns:1fr}
+      .promo-c.lt{border-left:none;border-right:none;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+
+      .plans{grid-template-columns:1fr;max-width:360px}
+      .plan.pop{transform:none}
+
+      .faq-wrap{grid-template-columns:1fr;gap:32px}
       .pricing,.faq{padding-left:28px;padding-right:28px}
     }
-    @media(max-width:540px){
-      .pgrid.g4,.pgrid.g3{grid-template-columns:1fr 1fr}
+
+    /* Small tablet / large phone */
+    @media(max-width:680px){
+      .pgrid.g4,.pgrid.g3{grid-template-columns:repeat(2,1fr)}
+
+      /* List card: hide right panel, show mobile footer */
       .lcard-right{display:none}
+      .lcard{flex-wrap:wrap}
+      .lcard-body{padding:12px 14px}
+      .lcard-name{font-size:14px}
+      .lcard-mobile-foot{display:flex}
+    }
+
+    /* Phone */
+    @media(max-width:420px){
+      .pgrid.g4,.pgrid.g3{grid-template-columns:1fr 1fr}
+      .pcard-name{font-size:12px}
+      .pcard-brand{font-size:6px}
+      .bsw-btn{font-size:6.5px;letter-spacing:.1em;padding:10px 10px}
+      .main-content{padding:14px 12px}
+      .loadmore{padding:28px 16px}
+      .pricing,.faq{padding-left:16px;padding-right:16px}
+      .promo-c{padding:28px 20px}
     }
   `}</style>
 );
@@ -421,6 +526,7 @@ const EyeI  = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" 
 const GridI = () => <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.1"><rect x="1" y="1" width="6" height="6"/><rect x="9" y="1" width="6" height="6"/><rect x="1" y="9" width="6" height="6"/><rect x="9" y="9" width="6" height="6"/></svg>;
 const ListI = () => <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.1"><line x1="1" y1="4" x2="15" y2="4"/><line x1="1" y1="8" x2="15" y2="8"/><line x1="1" y1="12" x2="15" y2="12"/></svg>;
 const PlusI = () => <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
+const ChevDown = () => <svg className="sb-toggle-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>;
 
 const ChkI = () => (
   <svg className="pf-ico y" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -489,7 +595,7 @@ const BRANCHES = [
   },
 ];
 
-/* ── PRODUCTS DATA (20+ per branch) ── */
+/* ── PRODUCTS DATA ── */
 const ALL_PRODUCTS = {
   chilonzor:[
     {id:1,cat:"Kostyum",brand:"Hugo Boss",name:"Slim Fit Kostyum",price:2490000,old:3100000,badges:["sale"],sizes:["S","M","L","XL"],img:"https://images.unsplash.com/photo-1594938298603-c8148c4b4685?w=600&q=80",img2:"https://images.unsplash.com/photo-1593030761757-71fae45fa0e7?w=600&q=80"},
@@ -604,29 +710,81 @@ const useToast = () => {
   const [msg, setMsg] = useState("");
   const [vis, setVis] = useState(false);
   const t = useRef(null);
-  const show = (m) => { setMsg(m); setVis(true); clearTimeout(t.current); t.current = setTimeout(() => setVis(false), 2200); };
+  const show = useCallback((m) => {
+    setMsg(m); setVis(true);
+    clearTimeout(t.current);
+    t.current = setTimeout(() => setVis(false), 2200);
+  }, []);
   return { msg, vis, show };
+};
+
+/* ── TOUCH DETECTION ── */
+const useIsMobile = () => {
+  const [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setMobile(window.innerWidth <= 900);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  return mobile;
 };
 
 /* ── GRID CARD ── */
 const GridCard = ({ p, toast }) => {
   const [wl, setWl] = useState(false);
   const [sz, setSz] = useState(null);
+  const [touched, setTouched] = useState(false);
   const disc = p.old ? Math.round((1 - p.price / p.old) * 100) : null;
+
+  const handleTouch = (e) => {
+    // First tap: reveal actions. Second tap on card body: proceed normally
+    if (!touched) {
+      e.preventDefault();
+      setTouched(true);
+      // Auto-hide after 3s of no interaction
+      setTimeout(() => setTouched(false), 3000);
+    }
+  };
+
   return (
-    <div className="pcard">
+    <div
+      className={`pcard${touched ? " touched" : ""}`}
+      onTouchStart={handleTouch}
+    >
       <div className="pcard-img-wrap">
         <img className="pcard-img" src={p.img} alt={p.name} loading="lazy"/>
         <img className="pcard-img2" src={p.img2} alt={p.name} loading="lazy"/>
         <div className="pcard-scan"/>
         <div className="pcards-badge">
-          {p.badges.map(b => <span key={b} className={`badge-tag ${b}`}>{b==="new"?"Yangi":b==="sale"?"Aksiya":b==="hit"?"Hit":"Limit"}</span>)}
+          {p.badges.map(b => (
+            <span key={b} className={`badge-tag ${b}`}>
+              {b==="new"?"Yangi":b==="sale"?"Aksiya":b==="hit"?"Hit":"Limit"}
+            </span>
+          ))}
         </div>
         <div className="pcard-actions">
-          <button className={`pact${wl?" wl":""}`} onClick={e=>{e.stopPropagation();setWl(v=>!v);toast.show(wl?"Olib tashlandi":'"'+p.name+'" sevimlilarga qo\'shildi')}}><Heart on={wl}/></button>
+          <button
+            className={`pact${wl?" wl":""}`}
+            onClick={e => {
+              e.stopPropagation();
+              setWl(v => !v);
+              toast.show(wl ? "Olib tashlandi" : `"${p.name}" sevimlilarga qo'shildi`);
+            }}
+          >
+            <Heart on={wl}/>
+          </button>
           <button className="pact"><EyeI/></button>
         </div>
-        <button className="pcard-add" onClick={e=>{e.stopPropagation();toast.show('"'+p.name+'" savatga qo\'shildi')}}>+ Savatga</button>
+        <button
+          className="pcard-add"
+          onClick={e => {
+            e.stopPropagation();
+            toast.show(`"${p.name}" savatga qo'shildi`);
+          }}
+        >
+          + Savatga
+        </button>
       </div>
       <div className="pcard-info">
         <div className="pcard-brand">{p.brand}</div>
@@ -636,7 +794,17 @@ const GridCard = ({ p, toast }) => {
           {p.old && <span className="pcard-old">{fmt(p.old)}</span>}
           {disc  && <span className="pcard-disc">−{disc}%</span>}
         </div>
-        <div className="pcard-sizes">{p.sizes.map(s=><span key={s} className={`sz${sz===s?" on":""}`} onClick={()=>setSz(s)}>{s}</span>)}</div>
+        <div className="pcard-sizes">
+          {p.sizes.map(s => (
+            <span
+              key={s}
+              className={`sz${sz===s?" on":""}`}
+              onClick={e => { e.stopPropagation(); setSz(s); }}
+            >
+              {s}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -646,6 +814,17 @@ const GridCard = ({ p, toast }) => {
 const ListCard = ({ p, toast }) => {
   const [wl, setWl] = useState(false);
   const disc = p.old ? Math.round((1 - p.price / p.old) * 100) : null;
+
+  const toggleWl = (e) => {
+    e.stopPropagation();
+    setWl(v => !v);
+    toast.show(wl ? "Olib tashlandi" : `"${p.name}" sevimlilarga qo'shildi`);
+  };
+  const addCart = (e) => {
+    e.stopPropagation();
+    toast.show(`"${p.name}" savatga qo'shildi`);
+  };
+
   return (
     <div className="lcard">
       <div className="lcard-scan"/>
@@ -660,13 +839,29 @@ const ListCard = ({ p, toast }) => {
           {disc  && <span className="pcard-disc" style={{fontSize:9}}>−{disc}%</span>}
         </div>
       </div>
+
+      {/* Desktop right panel */}
       <div className="lcard-right">
-        <div className="lcard-badges">{p.badges.map(b=><span key={b} className={`badge-tag ${b}`}>{b==="new"?"Yangi":b==="sale"?"Aksiya":b==="hit"?"Hit":"Limit"}</span>)}</div>
-        <div className="lcard-sizes">{p.sizes.slice(0,4).map(s=><span key={s} className="sz">{s}</span>)}</div>
-        <div className="lcard-btns">
-          <button className={`lbtn${wl?" wl":""}`} onClick={()=>{setWl(v=>!v);toast.show(wl?"Olib tashlandi":'"'+p.name+'" sevimlilarga qo\'shildi')}}><Heart on={wl}/></button>
-          <button className="lbtn-cart" onClick={()=>toast.show('"'+p.name+'" savatga qo\'shildi')}>+ Savat</button>
+        <div className="lcard-badges">
+          {p.badges.map(b => (
+            <span key={b} className={`badge-tag ${b}`}>
+              {b==="new"?"Yangi":b==="sale"?"Aksiya":b==="hit"?"Hit":"Limit"}
+            </span>
+          ))}
         </div>
+        <div className="lcard-sizes">
+          {p.sizes.slice(0,4).map(s => <span key={s} className="sz">{s}</span>)}
+        </div>
+        <div className="lcard-btns">
+          <button className={`lbtn${wl?" wl":""}`} onClick={toggleWl}><Heart on={wl}/></button>
+          <button className="lbtn-cart" onClick={addCart}>+ Savat</button>
+        </div>
+      </div>
+
+      {/* Mobile footer (shown on small screens) */}
+      <div className="lcard-mobile-foot">
+        <button className={`lbtn${wl?" wl":""}`} onClick={toggleWl}><Heart on={wl}/></button>
+        <button className="lbtn-cart" onClick={addCart}>+ Savatga</button>
       </div>
     </div>
   );
@@ -674,6 +869,7 @@ const ListCard = ({ p, toast }) => {
 
 /* ── SIDEBAR ── */
 const Sidebar = ({ branch, cat, setCat, sort, setSort }) => {
+  const [mobileOpen, setMobileOpen] = useState(false);
   const today = todayName();
   const todayH = branch.hours.find(h => h.day === today);
   const opened = checkOpen(todayH);
@@ -682,49 +878,86 @@ const Sidebar = ({ branch, cat, setCat, sort, setSort }) => {
 
   return (
     <div className="sidebar">
-      <div className="sb-section">
-        <div className="sb-label">Kategoriyalar</div>
-        {branch.cats.map(c => (
-          <div key={c} className={`sb-cat${cat===c?" on":""}`} onClick={() => setCat(c)}>
-            <span>{c}</span>
-            <span className="sb-cnt">{getCatCount(c)}</span>
-          </div>
-        ))}
-      </div>
+      {/* Mobile toggle button */}
+      <button
+        className={`sb-toggle${mobileOpen?" open":""}`}
+        onClick={() => setMobileOpen(v => !v)}
+      >
+        <span>Filter & Saralash</span>
+        <ChevDown/>
+      </button>
 
-      <div className="sb-divider"/>
-
-      <div className="sb-section">
-        <div className="sb-label">Saralash</div>
-        <div className="sb-sort">
-          {SORTS.map(s => (
-            <div key={s} className={`sb-sort-item${sort===s?" on":""}`} onClick={() => setSort(s)}>{s}</div>
+      {/* Content wrapper - always visible on desktop, collapsible on mobile */}
+      <div className={`sb-mobile-body${mobileOpen?" open":""}`}>
+        <div className="sb-section">
+          <div className="sb-label">Kategoriyalar</div>
+          {branch.cats.map(c => (
+            <div
+              key={c}
+              className={`sb-cat${cat===c?" on":""}`}
+              onClick={() => { setCat(c); setMobileOpen(false); }}
+            >
+              <span>{c}</span>
+              <span className="sb-cnt">{getCatCount(c)}</span>
+            </div>
           ))}
         </div>
-      </div>
 
-      <div className="sb-divider"/>
+        <div className="sb-divider"/>
 
-      <div className="sb-section">
-        <div className="sb-label" style={{display:"flex",alignItems:"center",gap:6}}>
-          Bugungi Ish Vaqti
-          <span className={`open-dot ${opened?"green":"red"}`}/>
-        </div>
-        <div className="sb-hours">
-          {branch.hours.map((h, i) => {
-            const isTd = h.day === today;
-            return (
-              <div key={i} className={`sbh-row${isTd?" today":""}`}>
-                <div style={{display:"flex",alignItems:"center"}}>
-                  <span className={`sbh-day${isTd?" td":""}`}>{h.day}</span>
-                  {isTd && <span className="today-tag">Bugun</span>}
-                </div>
-                <span className={`sbh-time${!h.open?" off":""}`}>{h.open ? `${h.open}–${h.close}` : "Yopiq"}</span>
+        <div className="sb-section">
+          <div className="sb-label">Saralash</div>
+          <div className="sb-sort">
+            {SORTS.map(s => (
+              <div
+                key={s}
+                className={`sb-sort-item${sort===s?" on":""}`}
+                onClick={() => { setSort(s); setMobileOpen(false); }}
+              >
+                {s}
               </div>
-            );
-          })}
+            ))}
+          </div>
+        </div>
+
+        <div className="sb-divider"/>
+
+        <div className="sb-section">
+          <div className="sb-label" style={{display:"flex",alignItems:"center",gap:6}}>
+            Bugungi Ish Vaqti
+            <span className={`open-dot ${opened?"green":"red"}`}/>
+          </div>
+          <div className="sb-hours">
+            {branch.hours.map((h, i) => {
+              const isTd = h.day === today;
+              return (
+                <div key={i} className={`sbh-row${isTd?" today":""}`}>
+                  <div style={{display:"flex",alignItems:"center"}}>
+                    <span className={`sbh-day${isTd?" td":""}`}>{h.day}</span>
+                    {isTd && <span className="today-tag">Bugun</span>}
+                  </div>
+                  <span className={`sbh-time${!h.open?" off":""}`}>
+                    {h.open ? `${h.open}–${h.close}` : "Yopiq"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
+
+      {/* Desktop-only content (always visible) */}
+      <style>{`
+        @media(min-width:901px){
+          .sb-toggle{display:none!important}
+          .sb-mobile-body{
+            display:flex!important;
+            flex-direction:column!important;
+            max-height:none!important;
+            overflow:visible!important;
+          }
+        }
+      `}</style>
     </div>
   );
 };
@@ -736,13 +969,14 @@ export default function IntroPage() {
   const branch = BRANCHES.find(b => b.id === branchId);
   const [cat, setCat] = useState("Barchasi");
   const [sort, setSort] = useState("Tavsiya etilgan");
-  const [view, setView] = useState("grid"); // grid | list
+  const [view, setView] = useState("grid");
   const [shown, setShown] = useState(12);
   const [yr, setYr] = useState(false);
   const [fopen, setFopen] = useState(null);
 
   const handleBranch = (id) => { setBranchId(id); setCat("Barchasi"); setShown(12); };
-  const products = (ALL_PRODUCTS[branchId] || []);
+
+  const products = ALL_PRODUCTS[branchId] || [];
   const filtered = products
     .filter(p => cat === "Barchasi" || p.cat === cat)
     .sort((a,b) => {
@@ -755,7 +989,10 @@ export default function IntroPage() {
   const visible = filtered.slice(0, shown);
   const prog = Math.min((shown / Math.max(filtered.length, 1)) * 100, 100);
 
-  const priceDisp = (mo) => { const v = yr ? Math.round(mo * 12 * 0.75) : mo; return v.toLocaleString("uz-UZ") + " so'm"; };
+  const priceDisp = (mo) => {
+    const v = yr ? Math.round(mo * 12 * 0.75) : mo;
+    return v.toLocaleString("uz-UZ") + " so'm";
+  };
 
   return (
     <>
@@ -765,7 +1002,11 @@ export default function IntroPage() {
       {/* branch strip */}
       <div className="bsw">
         {BRANCHES.map(b => (
-          <button key={b.id} className={`bsw-btn${branchId===b.id?" on":""}`} onClick={() => handleBranch(b.id)}>
+          <button
+            key={b.id}
+            className={`bsw-btn${branchId===b.id?" on":""}`}
+            onClick={() => handleBranch(b.id)}
+          >
             <span className="bsw-dot"/>
             {b.name}
             <span className="bsw-cnt">({(ALL_PRODUCTS[b.id]||[]).length})</span>
@@ -775,7 +1016,13 @@ export default function IntroPage() {
 
       {/* sidebar + products */}
       <div className="page">
-        <Sidebar branch={branch} cat={cat} setCat={c=>{setCat(c);setShown(12)}} sort={sort} setSort={setSort}/>
+        <Sidebar
+          branch={branch}
+          cat={cat}
+          setCat={c => { setCat(c); setShown(12); }}
+          sort={sort}
+          setSort={setSort}
+        />
         <div>
           <div className="main-content">
             <div className="content-head">
@@ -787,18 +1034,22 @@ export default function IntroPage() {
                 </div>
               </div>
               <div className="view-btns">
-                <button className={`vbtn${view==="grid"?" on":""}`} onClick={()=>setView("grid")}><GridI/></button>
-                <button className={`vbtn${view==="list"?" on":""}`} onClick={()=>setView("list")}><ListI/></button>
+                <button className={`vbtn${view==="grid"?" on":""}`} onClick={() => setView("grid")}><GridI/></button>
+                <button className={`vbtn${view==="list"?" on":""}`} onClick={() => setView("list")}><ListI/></button>
               </div>
             </div>
 
             {view === "grid" ? (
-              <div className={`pgrid g4`}>
-                {visible.map(p => <GridCard key={`${branchId}-${p.id}`} p={p} toast={toast}/>)}
+              <div className="pgrid g4">
+                {visible.map(p => (
+                  <GridCard key={`${branchId}-${p.id}`} p={p} toast={toast}/>
+                ))}
               </div>
             ) : (
               <div className="pgrid gl">
-                {visible.map(p => <ListCard key={`${branchId}-${p.id}`} p={p} toast={toast}/>)}
+                {visible.map(p => (
+                  <ListCard key={`${branchId}-${p.id}`} p={p} toast={toast}/>
+                ))}
               </div>
             )}
           </div>
@@ -819,17 +1070,17 @@ export default function IntroPage() {
         <div className="promo-c dk">
           <div className="promo-eyebrow">Maxsus taklif</div>
           <div className="promo-title">Yangi Kolleksiya<br/>−20% chegirma</div>
-          <button className="promo-btn" onClick={()=>toast.show("Aksiya sahifasi")}>Batafsil →</button>
+          <button className="promo-btn" onClick={() => toast.show("Aksiya sahifasi")}>Batafsil →</button>
         </div>
         <div className="promo-c lt">
           <div className="promo-eyebrow">Bepul xizmat</div>
           <div className="promo-title">Shaxsiy<br/>Stilist</div>
-          <button className="promo-btn" onClick={()=>toast.show("Ro'yxatdan o'tildi")}>Ro'yxatdan O'tish →</button>
+          <button className="promo-btn" onClick={() => toast.show("Ro'yxatdan o'tildi")}>Ro'yxatdan O'tish →</button>
         </div>
         <div className="promo-c md">
           <div className="promo-eyebrow">Yozgi chegirma</div>
           <div className="promo-title">−30% gacha<br/>Yozgi Kolleksiya</div>
-          <button className="promo-btn" onClick={()=>toast.show("Yozgi kolleksiya")}>Xarid Qilish →</button>
+          <button className="promo-btn" onClick={() => toast.show("Yozgi kolleksiya")}>Xarid Qilish →</button>
         </div>
       </div>
 
@@ -841,11 +1092,11 @@ export default function IntroPage() {
           <p className="pricing-desc">Yillik obunada 25% tejang. Istalgan vaqt bekor qilish mumkin.</p>
         </div>
         <div className="price-toggle">
-          <span className={`pt-lbl${!yr?" on":""}`} onClick={()=>setYr(false)}>Oylik</span>
-          <div className={`pt-sw${yr?" yr":" mo"}`} onClick={()=>setYr(v=>!v)}>
+          <span className={`pt-lbl${!yr?" on":""}`} onClick={() => setYr(false)}>Oylik</span>
+          <div className={`pt-sw${yr?" yr":" mo"}`} onClick={() => setYr(v => !v)}>
             <div className="pt-knob"/>
           </div>
-          <span className={`pt-lbl${yr?" on":""}`} onClick={()=>setYr(true)}>Yillik</span>
+          <span className={`pt-lbl${yr?" on":""}`} onClick={() => setYr(true)}>Yillik</span>
           {yr && <span className="save-tag">−25%</span>}
         </div>
         <div className="plans">
@@ -876,12 +1127,15 @@ export default function IntroPage() {
           <div>
             <div className="faq-eye">Savollar</div>
             <h2 className="faq-title">Ko'p so'raladigan savollar</h2>
-            <p className="faq-note">Javob topa olmadingizmi?<br/><a href="tel:+998971234567">+998 97 123 45 67</a></p>
+            <p className="faq-note">
+              Javob topa olmadingizmi?<br/>
+              <a href="tel:+998971234567">+998 97 123 45 67</a>
+            </p>
           </div>
           <div className="faq-list">
             {FAQS.map((f,i) => (
               <div key={i} className={`fi${fopen===i?" open":""}`}>
-                <button className="fi-q" onClick={()=>setFopen(fopen===i?null:i)}>
+                <button className="fi-q" onClick={() => setFopen(fopen===i?null:i)}>
                   <span className="fi-qt">{f.q}</span>
                   <div className="fi-ic"><PlusI/></div>
                 </button>
